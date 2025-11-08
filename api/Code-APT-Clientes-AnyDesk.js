@@ -1,8 +1,9 @@
+// CLAVE_REMOTA: 11aa
 // ==UserScript==
 // @name         APT -TOTAL <v-4.1.1>
 // @namespace    http://tampermonkey.net/
 // @version      4.1.1
-// @description  Añade el módulo de cálculo de honorarios "TARIFA-CATASTROS", habilita pegar en campos, activa el módulo de layout "APT-PANELES" y unifica/compacta la vista de archivos.
+// @description  Contrato y Planos
 // @author       Gemini
 // @match        https://apt.cfia.or.cr/APT2/*
 // @icon         https://apt.cfia.or.cr/favicon.ico
