@@ -1,9 +1,9 @@
 // CLAVE_REMOTA: 11aa
 // ==UserScript==
-// @name         APT -TOTAL <v-4.1.1>
+// @name         APT -TOTAL <v-4.1.5>
 // @namespace    http://tampermonkey.net/
-// @version      4.1.1
-// @description  Contrato y Planos
+// @version      4.1.5
+// @description  v4.1.5: Añadido módulo para auto-cerrar popup "Entero guardado con éxito".
 // @author       Gemini
 // @match        https://apt.cfia.or.cr/APT2/*
 // @icon         https://apt.cfia.or.cr/favicon.ico
@@ -11,7 +11,7 @@
 // @run-at       document-idle
 // ==/UserScript==
 
-// v-4.1.1
+// v-4.1.5
 
 (function() {
     'use strict';
@@ -24,7 +24,7 @@
 
     // --- "CEREBRO" ORQUESTADOR ÚNICO ---
     (function bootstrap() {
-        log('Iniciando Orquestador v4.1.1...');
+        log('Iniciando Orquestador v4.1.3...'); // El log interno del bootstrap sigue siendo 4.1.3, lo respetamos.
 
         // Variable global para rastrear archivos subidos
         window.archivosSubidosEnP7 = new Set();
@@ -60,7 +60,7 @@
                 contadorIntentos++;
                 if (estado === "BUSCANDO_PLANOS") {
                     const menuPlanos = Array.from(document.querySelectorAll('a.list-group-item'))
-                                          .find(function(el) { return el.textContent.trim().includes('Planos'); }); // ES5
+                        .find(function(el) { return el.textContent.trim().includes('Planos'); }); // ES5
                     if (menuPlanos) {
                         log('Módulo IR A PLANOS: Menú "Planos" encontrado. Dando clic...');
                         menuPlanos.click();
@@ -69,7 +69,7 @@
                 }
                 if (estado === "BUSCANDO_CONSULTA") {
                     const submenuConsulta = Array.from(document.querySelectorAll('a.text-reset'))
-                                             .find(function(el) { return el.textContent.trim() === 'Consulta'; }); // ES5
+                        .find(function(el) { return el.textContent.trim() === 'Consulta'; }); // ES5
                     if (submenuConsulta && visible(submenuConsulta)) {
                         log('Módulo IR A PLANOS: Submenú "Consulta" encontrado y visible. Dando clic...');
                         submenuConsulta.click();
@@ -161,7 +161,7 @@
 
             const getBotonGuardar = function() { // ES5
                 return (document.querySelector('#PRN button[onclick^="GuardarTramiteRN"]')
-                     || document.querySelector('button.btn.btn-outline-primary[onclick^="Guardar"]'));
+                    || document.querySelector('button.btn.btn-outline-primary[onclick^="Guardar"]'));
             };
 
             // --- Notificación parpadeante ---
@@ -252,6 +252,90 @@
         })(); // Fin del módulo IIFE de Reingreso
 
 
+        // --- MÓDULO SATÉLITE 5: PLANO MODIFICAR EN CONTRATO (v-1.0.1-b) ---
+        (function() {
+            // Este módulo se activa solo en la página de "Nuevo Contrato"
+            if (!window.location.href.includes('/APT2/Contrato/Nuevo')) {
+                return; // No es la página correcta
+            }
+            log('Activando módulo "PLANO MODIFICAR CONTRATO" (v-1.0.1-b)...');
+
+            function procesarCampos() {
+                const campoPlano = document.querySelector("#txtNumPlanoModificar");
+                const campoAnno = document.querySelector("#txtAnnoModificar");
+
+                if (!campoPlano || !campoAnno) return;
+
+                // ==================== DESBLOQUEAR CAMPO ====================
+                campoPlano.removeAttribute("maxlength");
+                campoPlano.removeAttribute("pattern");
+                campoPlano.classList.remove("solonumeros");
+                campoPlano.readOnly = false;
+                campoPlano.disabled = false;
+
+                campoPlano.onkeypress = null;
+                campoPlano.onkeydown = null;
+                campoPlano.oninput = null;
+                campoPlano.onpaste = null;
+
+                const bloqueos = ["keypress","keydown","keyup","input","beforeinput","paste"];
+                bloqueos.forEach(function(tipo) { // Convertido a ES5 forEach
+                    campoPlano.addEventListener(
+                        tipo,
+                        function(e) { e.stopPropagation(); }, // Convertido a ES5 function
+                        true
+                    );
+                });
+
+                // ==================== PROCESAR FORMATO ====================
+                function procesarFormato() {
+                    const raw = campoPlano.value.trim();
+
+                    // Formato P-0004657-2025
+                    const match = raw.match(/^([A-Za-z])-(\d+)-(\d{4})$/);
+                    if (!match) return;
+
+                    const numeroPlano = match[2]; // 0004657
+                    const anno = match[3]; // 2025
+
+                    // Mostrar solo el número en el campo de plano
+                    campoPlano.value = numeroPlano;
+
+                    // Guardar año global (El script original hacía esto, lo mantengo)
+                    window.APT_ANNO_PLANO_MODIFICAR = anno;
+
+                    // COPIAR automáticamente el año en su celda
+                    campoAnno.value = anno;
+
+                    // Usando el logger unificado y sintaxis ES5 para compatibilidad
+                    log("[Plano Modificar Contrato] Procesado -> Número:" + numeroPlano + " Año:" + anno);
+                }
+
+                // Eventos normales
+                campoPlano.addEventListener("input", procesarFormato);
+                campoPlano.addEventListener("change", procesarFormato);
+                campoPlano.addEventListener("blur", procesarFormato);
+
+                // Después del pegado
+                campoPlano.addEventListener("paste", function() {
+                    setTimeout(procesarFormato, 0);
+                });
+
+                log("[Plano Modificar Contrato] v-1.0.1-b activo: Año será copiado automáticamente.");
+            }
+
+            // Esperar que existan los campos
+            const intv = setInterval(function() { // Convertido a ES5 function
+                if (document.querySelector("#txtNumPlanoModificar") &&
+                    document.querySelector("#txtAnnoModificar")) {
+
+                    procesarCampos();
+                    clearInterval(intv);
+                }
+            }, 300);
+        })(); // Fin del módulo IIFE de Plano Modificar Contrato
+
+
         // --- MÓDULO SATÉLITE: TARIFA-CATASTROS ---
         function activarCalculadoraHonorarios() {
             const areaInput = document.getElementById('txtareareal');
@@ -310,7 +394,7 @@
                 menuTexto: "16px", menuIcono: "0.4em", menuEspacio: "2px"
             };
             const LS = {
-                get: function(key, fallback) { try { return localStorage.getItem(key) ?? fallback; } catch (e) { return fallback; } }, // ES5 (?? -> ||)
+                get: function(key, fallback) { try { return localStorage.getItem(key) || fallback; } catch (e) { return fallback; } }, // ES5 (?? -> ||)
                 set: function(key, val) { try { localStorage.setItem(key, val); } catch (e) {} }
             };
             const state = {
@@ -428,7 +512,7 @@
         }
         iniciarModuloAptPaneles();
 
-        // --- MÓDULO SATÉLITE: GESTOR DE ARCHIVOS UNIFICADO (v-1.0.2) ---
+        // --- MÓDULO SATÉLITE: GESTOR DE ARCHIVOS UNIFICADO (v-1.0.3) ---
         (function() {
             log('Activando módulo "GESTOR DE ARCHIVOS UNIFICADO"...');
 
@@ -445,7 +529,7 @@
 
                 const COLORES_NITIDOS = {
                     ANVERSO: '#1E90FF', // Azul
-                    ENTERO: '#32CD32',  // Verde
+                    ENTERO: '#32CD32', // Verde
                     DERROTERO: '#FF8C00', // Naranja
                     MINUTA: '#FF00FF', // Magenta
                     IMAGEN: '#00CED1', // Turquesa
@@ -535,10 +619,11 @@
                 }
             })(); // Fin del submódulo IIFE de Archivos en una Línea
 
-            // --- (B) MÓDULO INTERNO: GESTOR DE PESTAÑA ARCHIVOS ---
+            // --- (B) MÓDULO INTERNO: GESTOR DE PESTAÑA ARCHIVOS + AUTO-CARGAR ---
             (function() {
                 let panelArchivosVisible = false;
                 let observerArchivos = null;
+                let autoCargarIniciado = false;
 
                 function gestionarTipoArchivoPorDefecto() {
                     const select = document.getElementById('ddlTipoArchivo');
@@ -611,6 +696,110 @@
                     }
                 }
 
+                // --- SUBMÓDULO: AUTO CARGAR ARCHIVO ---
+                function iniciarAutoCargarArchivo() {
+                    if (autoCargarIniciado) return;
+                    autoCargarIniciado = true;
+
+                    log('[Gestor Archivos] Iniciando submódulo "AUTO CARGAR ARCHIVO"...');
+
+                    var ultimoTituloCargado = null;
+
+                    function clickCargarArchivo(titulo) {
+                        var btn = document.getElementById('btnCargarArchivo');
+                        if (!btn) {
+                            log('[Gestor Archivos][Auto Cargar] Botón #btnCargarArchivo no encontrado.');
+                            return;
+                        }
+                        log('[Gestor Archivos][Auto Cargar] Clic automático en CARGAR ARCHIVO para: ' + titulo);
+                        btn.click();
+                        ultimoTituloCargado = titulo;
+                    }
+
+                    function procesarCampo(campo) {
+                        if (!campo || campo.dataset.aptaObs === '1') return;
+
+                        campo.dataset.aptaObs = '1';
+
+                        var observer = new MutationObserver(function(mutations) {
+                            mutations.forEach(function(m) {
+                                if (m.type === 'attributes' && m.attributeName === 'title') {
+                                    var titulo = (campo.getAttribute('title') || '').trim();
+                                    if (!titulo) return;
+                                    if (titulo === ultimoTituloCargado) return;
+
+                                    console.log('📄 Archivo detectado (title):', titulo);
+
+                                    setTimeout(function() {
+                                        clickCargarArchivo(titulo);
+                                    }, 400);
+                                }
+                            });
+                        });
+
+                        observer.observe(campo, {
+                            attributes: true,
+                            attributeFilter: ['title']
+                        });
+
+                        var inicial = (campo.getAttribute('title') || '').trim();
+                        if (inicial) {
+                            console.log('📄 Archivo actual (title al enganchar):', inicial);
+                            ultimoTituloCargado = inicial;
+                        }
+                    }
+
+                    function buscarCamposIniciales() {
+                        var campos = document.querySelectorAll('#P7 input.file-caption-name, input.file-caption-name');
+                        if (campos.length > 0) {
+                            log('[Gestor Archivos][Auto Cargar] Encontrados ' + campos.length + ' input.file-caption-name.');
+                            campos.forEach(procesarCampo);
+                            return true;
+                        }
+                        return false;
+                    }
+
+                    var intentos = 0;
+                    var maxIntentos = 15;
+
+                    var timer = setInterval(function() {
+                        intentos++;
+                        if (buscarCamposIniciales() || intentos >= maxIntentos) {
+                            clearInterval(timer);
+                        }
+                    }, 700);
+
+                    var bodyObserver = new MutationObserver(function(mutations) {
+                        mutations.forEach(function(m) {
+                            if (m.type === 'childList' && m.addedNodes.length > 0) {
+                                Array.prototype.forEach.call(m.addedNodes, function(node) {
+                                    if (!(node instanceof HTMLElement)) return;
+
+                                    if (node.matches && node.matches('input.file-caption-name')) {
+                                        procesarCampo(node);
+                                    }
+
+                                    if (node.querySelectorAll) {
+                                        var internos = node.querySelectorAll('input.file-caption-name');
+                                        if (internos.length > 0) {
+                                            internos.forEach(procesarCampo);
+                                        }
+                                    }
+                                });
+                            }
+                        });
+                    });
+
+                    if (document.body) {
+                        bodyObserver.observe(document.body, {
+                            childList: true,
+                            subtree: true
+                        });
+                        log('[Gestor Archivos][Auto Cargar] MutationObserver sobre <body> iniciado.');
+                    }
+                }
+                // --- FIN SUBMÓDULO AUTO CARGAR ARCHIVO ---
+
                 function escanearYActualizar() {
                     if (typeof window.runArchivosEnUnaLinea !== 'function') {
                         log('Error: Módulo "runArchivosEnUnaLinea" no encontrado.');
@@ -652,6 +841,7 @@
                             runAnchoCompletoArchivos();
                             runEliminarMensajeArchivos();
                             escanearYActualizar();
+                            iniciarAutoCargarArchivo();
 
                             if (listaArchivos) {
                                 observerArchivos.observe(listaArchivos, {
@@ -669,6 +859,245 @@
                 }, 500); // Intervalo de vigilancia
             })(); // Fin del submódulo IIFE Gestor de Archivos
         })(); // --- FIN MÓDULO: GESTOR DE ARCHIVOS UNIFICADO ---
+
+
+        // --- MÓDULO SATÉLITE: COPIAR-CONTRATO (v-1.0.1) ---
+        (function () {
+            'use strict';
+            // v-1.0.1 INICIO MODULO COPIAR-CONTRATO
+
+            // Este módulo se activa solo en la página de "Nuevo Contrato"
+            if (!window.location.href.includes('/APT2/Contrato/Nuevo')) {
+                return; // No es la página correcta
+            }
+
+            const VERSION     = 'v-1.0.1';
+            const MAX_INTENTOS = 40;         // Máximo de intentos de búsqueda
+            const INTERVALO_MS = 500;        // Tiempo entre intentos (ms)
+
+            let intentos = 0;
+            let yaCapturado = false;
+            let temporizador = null;
+
+            // --- Log sencillo (local a este módulo) ---
+            function log(msg) {
+                console.log(`[APT Trámite ${VERSION}] ${msg}`);
+            }
+
+            // Normaliza texto (quita acentos y pasa a minúsculas)
+            function normalizarTexto(str) {
+                return (str || '')
+                    .normalize('NFD')
+                    .replace(/[\u0300-\u036f]/g, '')
+                    .toLowerCase()
+                    .trim();
+            }
+
+            // Busca el texto que contiene "Trámite:" dentro del tab de planos
+            function obtenerTextoTramite() {
+                const contenedorPlano = document.querySelector('#plano') || document;
+                if (!contenedorPlano) return null;
+
+                const candidatos = contenedorPlano.querySelectorAll('h1, h2, h3, span, div, p');
+                for (const el of candidatos) {
+                    const texto = (el.textContent || '').trim();
+                    if (texto.startsWith('Trámite:')) {
+                        return texto;
+                    }
+                }
+                return null;
+            }
+
+            // Extrae sólo los dígitos a la derecha de "Trámite:"
+            function extraerDigitos(textoTramite) {
+                if (!textoTramite) return null;
+                const match = textoTramite.match(/Trámite:\s*([0-9]+)/);
+                return match ? match[1] : null;
+            }
+
+            // Obtiene el valor numérico del área total ingresada (si existe)
+            // Devuelve:
+            //   - número (ej. 0, 423.17) si logra leerlo
+            //   - null si no encuentra el texto todavía
+            function obtenerValorAreaTotal() {
+                const contenedorPlano = document.querySelector('#plano') || document;
+                if (!contenedorPlano) return null;
+
+                const candidatos = contenedorPlano.querySelectorAll('h1, h2, h3, span, div, p');
+
+                for (const el of candidatos) {
+                    const textoRaw = (el.textContent || '').trim();
+                    if (!textoRaw) continue;
+
+                    const textoNorm = normalizarTexto(textoRaw);
+                    if (!textoNorm.includes('area total ingresada')) continue;
+
+                    // Busca un número antes de "m2" o "m²"
+                    const match = textoRaw.match(/([0-9]+(?:[.,][0-9]+)?)\s*m[²2]/i);
+                    if (match) {
+                        const numero = parseFloat(match[1].replace(',', '.'));
+                        if (!isNaN(numero)) {
+                            return numero;
+                        }
+                    }
+                }
+
+                return null;
+            }
+
+            // Copia el texto al portapapeles
+            function copiarAlPortapapeles(texto) {
+                try {
+                    // El script principal usa "@grant none", por lo que GM_setClipboard NO estará disponible.
+                    if (typeof GM_setClipboard === 'function') {
+                        // Esta rama probablemente nunca se ejecute, pero se deja por seguridad
+                        GM_setClipboard(texto);
+                        log(`Trámite copiado con GM_setClipboard: ${texto}`);
+                    } else if (navigator.clipboard && navigator.clipboard.writeText) {
+                        // Se usará este método (navigator.clipboard)
+                        navigator.clipboard.writeText(texto)
+                            .then(() => log(`Trámite copiado con navigator.clipboard: ${texto}`))
+                            .catch(err => console.error('[APT Trámite] Error al copiar:', err));
+                    } else {
+                        log('No hay API de portapapeles disponible.');
+                    }
+                } catch (e) {
+                    console.error('[APT Trámite] Excepción al copiar:', e);
+                }
+            }
+
+            // Intenta localizar menú PLANOS, área total y Trámite y copiarlo
+            function intentarCapturaTramite() {
+                if (yaCapturado) return;
+
+                // Debe existir el menú de PLANOS
+                const menuPlanos = document.querySelector('#plano-tab');
+                if (!menuPlanos) {
+                    return; // aún no aparece el menú
+                }
+
+                // 1) Verificar que el Área Total Ingresada sea 0 m²
+                const valorArea = obtenerValorAreaTotal();
+
+                // Si todavía no encuentra el texto de área, seguimos intentando en la próxima vuelta
+                if (valorArea === null) {
+                    log('Área Total aún no detectada, reintentando...');
+                    return;
+                }
+
+                // Si el área es distinta de cero, NO copiamos el trámite y ya no seguimos más
+                if (valorArea !== 0) {
+                    log(`Área Total Ingresada = ${valorArea} (≠ 0). No se copia el Trámite.`);
+                    yaCapturado = true;
+                    if (temporizador) {
+                        clearInterval(temporizador);
+                        temporizador = null;
+                    }
+                    return;
+                }
+
+                // 2) Si el área es exactamente 0, ahora sí leemos el Trámite
+                const textoTramite = obtenerTextoTramite();
+                const digitos = extraerDigitos(textoTramite);
+
+                if (digitos) {
+                    yaCapturado = true;
+                    copiarAlPortapapeles(digitos);
+                    log(`Trámite detectado y copiado (Área=0): ${digitos}`);
+
+                    if (temporizador) {
+                        clearInterval(temporizador);
+                        temporizador = null;
+                    }
+                }
+            }
+
+            // Bucle de intentos limitados
+            temporizador = setInterval(() => {
+                intentos++;
+
+                if (yaCapturado || intentos > MAX_INTENTOS) {
+                    if (temporizador) {
+                        clearInterval(temporizador);
+                        temporizador = null;
+                    }
+                    if (!yaCapturado) {
+                        log('No se logró encontrar condición (Área=0 + Trámite) dentro del número máximo de intentos.');
+                    }
+                    return;
+                }
+
+                intentarCapturaTramite();
+            }, INTERVALO_MS);
+
+            // Intento extra al cargar totalmente la página
+            window.addEventListener('load', () => {
+                if (!yaCapturado) {
+                    intentarCapturaTramite();
+                }
+            });
+
+            log('Módulo COPIAR-CONTRATO iniciado.');
+
+            // v-1.0.1 FIN MODULO COPIAR-CONTRATO
+        })(); // Fin IIFE Módulo COPIAR-CONTRATO
+
+
+        // --- MÓDULO SATÉLITE: CERRAR POPUP 'ENTERO GUARDADO' (v-1.0.0) ---
+        (function() {
+            // Usar la función 'log' global si existe, o un console.log de respaldo
+            var logLocal_ENT = (typeof log === 'function') ?
+                function(msg) { log('[Entero Popup] ' + msg); } :
+                function(msg) { console.log('[Entero Popup] ' + msg); };
+
+            logLocal_ENT('Activando módulo "CERRAR POPUP ENTERO GUARDADO"...');
+
+            /**
+             * Esta función vigila el DOM en busca de la aparición del popup de SweetAlert
+             * con el título específico y hace clic en el botón de confirmar.
+             */
+            function autoClickConfirm_ENT() {
+                // 1. Crear un MutationObserver.
+                var observer_ENT = new MutationObserver(function(mutationsList_ENT, obs_ENT) {
+
+                    // Recorrer todas las mutaciones que ocurrieron (estilo ES5)
+                    for (var i = 0; i < mutationsList_ENT.length; i++) {
+                        var mutation_ENT = mutationsList_ENT[i];
+
+                        // Solo nos interesan las mutaciones donde se añadieron nuevos elementos
+                        if (mutation_ENT.type === 'childList' && mutation_ENT.addedNodes.length > 0) {
+
+                            // 2. Buscar el elemento del título por su ID
+                            var titleElement_ENT = document.getElementById('swal2-title');
+
+                            // 3. Verificar si el título existe y tiene el texto exacto
+                            // Se usa (innerText || textContent) para máxima compatibilidad
+                            if (titleElement_ENT && (titleElement_ENT.innerText || titleElement_ENT.textContent).trim() === "Entero guardado con éxito") {
+
+                                // 4. Si el título es correcto, buscar el botón "Aceptar"
+                                var acceptButton_ENT = document.querySelector('button.swal2-confirm');
+
+                                // 5. Si se encuentra el botón, hacer clic en él
+                                if (acceptButton_ENT) {
+                                    logLocal_ENT('Popup "Entero guardado con éxito" detectado. Haciendo clic en Aceptar.');
+                                    acceptButton_ENT.click();
+                                }
+                            }
+                        }
+                    }
+                });
+
+                // 6. Iniciar el observador
+                observer_ENT.observe(document.body, {
+                    childList: true,
+                    subtree: true
+                });
+            }
+
+            // Ejecutar la función principal del módulo
+            autoClickConfirm_ENT();
+
+        })(); // Fin del módulo IIFE de Entero Popup
 
 
         // --- LÓGICA PRINCIPAL DEL ORQUESTADOR (v3.7) ---
@@ -753,7 +1182,12 @@
                 const msg = document.querySelector('#swal2-html-container');
 
                 if (titleEl && /enviado/i.test(titleEl.textContent) && msg && /guardado exitosamente/i.test(msg.textContent)) {
-                    return;
+                    return; // Este popup lo maneja el módulo de Reingreso
+                }
+
+                // Excepción para el nuevo módulo de Enteros. Si él lo maneja, el orquestador no hace nada.
+                if (titleEl && (titleEl.innerText || titleEl.textContent).trim() === "Entero guardado con éxito") {
+                    return; // Este popup lo maneja el módulo 'Entero Popup'
                 }
 
                 if (titleEl && /Plano a modificar guardado con éxito/i.test(titleEl.textContent)) { sessionStorage.setItem('APT_PLANOS_FASE', 'RESYNC_PLANOS_MODIFICAR'); superClick(confirmButton); }
@@ -809,4 +1243,4 @@
 
 })();
 
-// v-4.1.1
+// v-4.1.5
