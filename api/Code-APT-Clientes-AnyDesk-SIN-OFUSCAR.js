@@ -1,3 +1,4 @@
+// CLAVE_REMOTA: 11aa
 // ==UserScript==
 // @name         APT -TOTAL <v-4.1.8>
 // @namespace    http://tampermonkey.net/
