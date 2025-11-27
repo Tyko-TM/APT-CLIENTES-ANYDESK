@@ -1,9 +1,8 @@
-// CLAVE_REMOTA: 11aa
 // ==UserScript==
-// @name         APT -TOTAL <v-4.1.8>
+// @name         APT TOTAL PARA CLIENTES ANYDESK <versión 4.1.8>
 // @namespace    http://tampermonkey.net/
 // @version      4.1.8
-// @description  v4.1.8: Fusión con módulo Archivos v-1.0.0 (oculta espacio vacío dinámicamente) y correcciones previas de Plano Modificar.
+// @description  v4.1.8: Versión unificada para clientes AnyDesk (con control de acceso).
 // @author       Gemini
 // @match        https://apt.cfia.or.cr/APT2/*
 // @icon         https://apt.cfia.or.cr/favicon.ico
@@ -11,10 +10,63 @@
 // @run-at       document-idle
 // ==/UserScript==
 
-// v-4.1.8
+// ===============================================================
+//  SISTEMA DE SEGURIDAD APT-ANYDESK (DENTRO DEL 4.1.8)
+//  ---------------------------------------------------------------
+//  ⚠ CÓMO CAMBIAR LA CLAVE (FRAN):
+//
+//  1) Cambia SOLO el texto entre comillas de CLIENT_PASS.
+//     Ejemplo actual:
+//
+//        const CLIENT_PASS = '11aa';
+//
+//     Si quieres otra:
+//
+//        const CLIENT_PASS = 'MiClave2025';
+//
+//  2) Guarda este script y luego OFUSCA TODO el 4.1.8 completo.
+//  3) El lanzador se encargará de pasar la clave digitada por el
+//     cliente en __APT_CLIENT_PASS__ y el token en __TYKO_SECURE_TOKEN__.
+//  4) Si alguien roba este JS ofuscado y trata de ejecutarlo sin
+//     lanzar antes el token+clave correctos, NO se ejecutará nada.
+// ===============================================================
 
-(function() {
+// 🔐 CLAVE DEL CLIENTE (DENTRO DEL 4.1.8)
+const CLIENT_PASS = '11aa';
+
+(function () {
     'use strict';
+
+    // --- BLOQUE DE VALIDACIÓN DE ACCESO ---
+    (function seguridadAPT() {
+        // Clave que envía el lanzador
+        var passIngresado = window.__APT_CLIENT_PASS__;
+        var token         = window.__TYKO_SECURE_TOKEN__;
+
+        // Limpiamos huellas
+        window.__APT_CLIENT_PASS__ = null;
+        window.__TYKO_SECURE_TOKEN__ = null;
+        try {
+            delete window.__APT_CLIENT_PASS__;
+            delete window.__TYKO_SECURE_TOKEN__;
+        } catch (e) {}
+
+        if (token !== 'ACCESO-TYKO-OK') {
+            console.error('[APT-ANYDESK] Lanzador no autorizado (token inválido).');
+            return; // Corta toda la ejecución del 4.1.8
+        }
+
+        if (passIngresado !== CLIENT_PASS) {
+            console.error('[APT-ANYDESK] Clave incorrecta.');
+            alert('⛔ Acceso denegado.\n\nLa clave es incorrecta.');
+            return; // Corta la ejecución del 4.1.8
+        }
+
+        console.log('%c[APT-ANYDESK] Clave correcta. Iniciando módulos 4.1.8...', 'color: #4caf50;');
+    })();
+
+    // 🔻 A partir de aquí deja TODO tu código 4.1.8 tal cual lo tienes:
+
 
     // --- SECCIÓN DE HERRAMIENTAS ---
     function log(message) { console.log(`[APT Unificado] ${message}`); }
